@@ -23,12 +23,8 @@ Plus **3 meta tools**: `govc_search` (fuzzy search across all commands), `govc_h
 ## Quick Start — Docker
 
 ```bash
-docker run --rm -i \
-  -e GOVC_URL=https://vcenter.example.com/sdk \
-  -e GOVC_USERNAME=admin@vsphere.local \
-  -e GOVC_PASSWORD=secret \
-  -e GOVC_INSECURE=1 \
-  ghcr.io/2501-ai/vmware-mcp
+cp .env.docker.example .env.docker  # fill in your credentials
+docker run --rm -i --name vmware-mcp --env-file .env.docker ghcr.io/2501-ai/vmware-mcp
 ```
 
 ## Quick Start — From Source
