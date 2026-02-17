@@ -25,7 +25,7 @@ console.error('✓ govc credentials configured');
 // MCP Server
 // ---------------------------------------------------------------------------
 
-const server = new Server({ name: 'mcp-govc-vcenter', version: '1.0.0' }, { capabilities: { tools: {} } });
+const server = new Server({ name: 'vmware-mcp', version: '1.0.0' }, { capabilities: { tools: {} } });
 
 // Generate typed tools from command definitions
 const typedTools = generateMCPTools();
@@ -198,7 +198,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error(`govc MCP server running on stdio (${typedTools.length} typed tools + 3 meta tools)`);
+  console.error(`VMWare MCP server running on stdio (${typedTools.length} typed tools + 3 meta tools)`);
   startHttpServer();
 }
 
