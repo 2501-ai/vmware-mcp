@@ -34,8 +34,10 @@ git clone https://github.com/2501-ai/vmware-mcp.git
 cd vmware-mcp
 bun install
 cp .env.example .env  # fill in your credentials
-bun run start
+bun run ui  # opens MCP Inspector in your browser
 ```
+
+> To wire the server into an MCP client directly, see the [Scripts](#scripts) section.
 
 ## Configuration
 
