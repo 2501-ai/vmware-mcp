@@ -29,3 +29,7 @@
 ## .env
 
 Uses `export` prefix so both `source .env` (for govc CLI) and Bun auto-load work. See `.env.example`.
+
+## Housekeeping
+
+When making changes to the project, keep this file up to date. If you add scripts, change conventions, or alter the workflow, update the relevant section here. This file should stay short — directives only, no duplication of the README.
