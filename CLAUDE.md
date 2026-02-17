@@ -32,7 +32,8 @@
 
 ## .env
 
-Uses `export` prefix so both `source .env` (for govc CLI) and Bun auto-load work. See `.env.example`.
+- `.env` — uses `export` prefix so both `source .env` (for govc CLI) and Bun auto-load work. See `.env.example`.
+- `.env.docker` — plain `KEY=VALUE` format (no `export`) for Docker `--env-file`. See `.env.docker.example`.
 
 ## Housekeeping
 
