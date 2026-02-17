@@ -1,133 +1,94 @@
 # VMWare MCP
 
-MCP (Model Context Protocol) server that wraps VMware's `govc` CLI, exposing vSphere operations as typed tools for AI agents. Runs on **Bun**, communicates over stdio.
+An [MCP](https://modelcontextprotocol.io/) server that gives AI agents direct access to your VMware vSphere infrastructure. Built on top of [`govc`](https://github.com/vmware/govmomi/tree/main/govc), it exposes **55 typed tools** covering VM lifecycle, snapshots, datastores, networking, and more.
 
-## Prerequisites
+## Available Tools
 
-- [Bun](https://bun.sh/) ≥ 1.0
-- [govc](https://github.com/vmware/govmomi/tree/main/govc) installed and in `PATH`
-- Access to a vCenter / ESXi host
+| Category                  | Tools                                                                                                                                                                                                                        |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Navigation**            | `about`, `ls`, `find`, `tree`, `events`, `tasks`, `logs`, `logs.ls`                                                                                                                                                          |
+| **VM Lifecycle**          | `vm.create`, `vm.clone`, `vm.instantclone`, `vm.destroy`, `vm.register`, `vm.unregister`, `vm.upgrade`                                                                                                                       |
+| **VM Configuration**      | `vm.change`, `vm.customize`, `vm.info`, `vm.ip`, `vm.power`, `vm.migrate`, `vm.vnc`, `vm.question`                                                                                                                           |
+| **VM Disks**              | `vm.disk.create`, `vm.disk.attach`, `vm.disk.change`, `vm.disk.promote`                                                                                                                                                      |
+| **VM Networking**         | `vm.network.add`, `vm.network.change`                                                                                                                                                                                        |
+| **VM Options & Policies** | `vm.option.info`, `vm.option.ls`, `vm.policy.ls`, `vm.target.info`, `vm.target.cap.ls`, `vm.guest.tools`                                                                                                                     |
+| **Snapshots**             | `snapshot.create`, `snapshot.remove`, `snapshot.export`, `snapshot.tree`                                                                                                                                                     |
+| **Datastore**             | `datastore.info`, `datastore.ls`, `datastore.cp`, `datastore.mv`, `datastore.tail`, `datastore.disk.info`, `datastore.cluster.info`, `datastore.cluster.change`, `datastore.maintenance.enter`, `datastore.maintenance.exit` |
+| **Session**               | `session.login`, `session.logout`, `session.ls`, `session.rm`                                                                                                                                                                |
+| **vSAN**                  | `vsan.info`                                                                                                                                                                                                                  |
+| **Task**                  | `task.cancel`                                                                                                                                                                                                                |
 
-## Quick Start
+Plus **3 meta tools**: `govc_search` (fuzzy search across all commands), `govc_help` (get help for any command), and `govc_run` (escape hatch for any govc command).
 
-```bash
-bun install
-cp .env.example .env   # fill in your credentials
-source .env             # export vars for both govc CLI and the MCP server
-bun run start           # start the MCP server on stdio
-```
-
-## Environment Variables
-
-Create a `.env` file at the project root (already in `.gitignore`):
-
-```bash
-export GOVC_URL=https://vcenter.example.com/sdk
-export GOVC_USERNAME=admin@vsphere.local
-export GOVC_PASSWORD=secret
-export GOVC_INSECURE=1
-```
-
-| Variable          | Required | Description                                  |
-| ----------------- | -------- | -------------------------------------------- |
-| `GOVC_URL`        | ✅       | vCenter / ESXi SDK URL                       |
-| `GOVC_USERNAME`   | ✅       | vSphere username                             |
-| `GOVC_PASSWORD`   | ✅       | vSphere password                             |
-| `GOVC_INSECURE`   |          | Set `1` to skip TLS verification             |
-| `GOVC_BIN`        |          | Path to `govc` binary (default: `govc`)      |
-| `GOVC_TIMEOUT_MS` |          | Subprocess timeout in ms (default: `120000`) |
-
-> Bun auto-loads `.env` files. The `export` prefix is kept so `source .env` also works for direct `govc` CLI usage.
-
-## SSH Tunnel (remote vCenter)
-
-If vCenter is only reachable from an internal network, create an SSH tunnel through a jump host:
+## Quick Start — Docker
 
 ```bash
-# Terminal 1 — open the tunnel (keeps running)
-sudo ssh -J <jump_user>@<jump_host> -L 443:<vcenter_host>:443 <user>@<internal_host> -N
-```
-
-Then set `GOVC_URL=https://localhost/sdk` in your `.env`. The `GOVC_INSECURE=1` flag is required since the TLS cert won't match `localhost`.
-
-To use a non-privileged local port (no `sudo`):
-
-```bash
-ssh -J <jump_user>@<jump_host> -L 8443:<vcenter_host>:443 <user>@<internal_host> -N
-```
-
-Then set `GOVC_URL=https://localhost:8443/sdk`.
-
-## Scripts
-
-```bash
-bun run start            # Run the MCP server (stdio)
-bun run dev              # Run with --watch for development
-bun run ui               # Launch MCP Inspector (web UI for testing)
-bun run check            # Biome check + tsc --noEmit (CI gate)
-bun run lint             # Biome lint only
-bun run lint:fix         # Biome lint with auto-fix
-bun run format           # Biome format with auto-write
-bun run format:check     # Biome format check only
-bun run typecheck        # TypeScript type checking only
-bun run docker:build     # Build Docker image (linux/amd64)
-```
-
-## Testing Locally
-
-The easiest way to test is the MCP Inspector:
-
-```bash
-bun run ui
-```
-
-This opens a web UI where you can browse all tools, call them with arguments, and inspect responses in real time.
-
-## Architecture
-
-```
-src/
-├── index.ts        # Entry point — MCP server setup, tool registration, env validation
-├── commands.ts     # Command registry (GOVC_COMMAND_INDEX + GOVC_TOOL_DEFS)
-├── generator.ts    # Converts GOVC_TOOL_DEFS → MCPTool objects with JSON Schema
-├── executor.ts     # Spawns govc subprocesses, handles flags/timeout/JSON parsing
-├── search.ts       # Fuzzy search over command index (Fuse.js)
-└── httpServer.ts   # Minimal HTTP health-check server
-```
-
-The server exposes **3 meta tools** + all typed tools from `commands.ts`:
-
-| Meta Tool     | Description                                        |
-| ------------- | -------------------------------------------------- |
-| `govc_search` | Fuzzy search across all registered commands        |
-| `govc_help`   | Get `govc <cmd> -h` output for any command         |
-| `govc_run`    | Escape hatch — run any govc command with raw flags |
-
-Typed tools are auto-generated from `GOVC_TOOL_DEFS` in `commands.ts`. Each definition specifies the command name, description, typed flags with JSON Schema, and optional positional arguments.
-
-## Adding a New Command
-
-1. Add an entry to `GOVC_COMMAND_INDEX` in `commands.ts` (name, description, category).
-2. Add a `GovcToolDef` to `GOVC_TOOL_DEFS` with the command name, description, typed flags, and optional `positionalArgs`.
-3. No other changes needed — the generator wires everything automatically.
-4. Run `bun run check` to validate.
-
-## Docker
-
-```bash
-bun run docker:build
-
-docker run --rm \
+docker run --rm -i \
   -e GOVC_URL=https://vcenter.example.com/sdk \
   -e GOVC_USERNAME=admin@vsphere.local \
   -e GOVC_PASSWORD=secret \
   -e GOVC_INSECURE=1 \
-  vmware-mcp
+  ghcr.io/2501-ai/vmware-mcp
 ```
 
-## Git Workflow
+## Quick Start — From Source
 
-- **Never push directly to `main`** — create a feature branch and open a PR.
-- Branch naming: `feature/<short-description>` or `fix/<short-description>`.
-- Commit messages: conventional commits (`feat:`, `fix:`, `refactor:`, `chore:`, etc.).
-- Always run `bun run check` before committing.
+```bash
+git clone https://github.com/2501-ai/vmware-mcp.git
+cd vmware-mcp
+bun install
+cp .env.example .env  # fill in your credentials
+bun run start
+```
+
+## Configuration
+
+| Variable          | Required | Description                                                     |
+| ----------------- | -------- | --------------------------------------------------------------- |
+| `GOVC_URL`        | ✅       | vCenter / ESXi SDK URL (e.g. `https://vcenter.example.com/sdk`) |
+| `GOVC_USERNAME`   | ✅       | vSphere username                                                |
+| `GOVC_PASSWORD`   | ✅       | vSphere password                                                |
+| `GOVC_INSECURE`   |          | Set `1` to skip TLS verification                                |
+| `GOVC_BIN`        |          | Path to `govc` binary (default: `govc`)                         |
+| `GOVC_TIMEOUT_MS` |          | Subprocess timeout in ms (default: `120000`)                    |
+
+## SSH Tunnel
+
+If vCenter is only reachable through an internal network:
+
+```bash
+ssh [-J jump_user@jump_host] -L 8443:vcenter_host:443 user@internal_host -N
+```
+
+Then use `GOVC_URL=https://localhost:8443/sdk` with `GOVC_INSECURE=1`.
+
+---
+
+## Development
+
+### Prerequisites
+
+- [Bun](https://bun.sh/) ≥ 1.0
+- [govc](https://github.com/vmware/govmomi/tree/main/govc) in `PATH`
+
+### Scripts
+
+| Script                    | Description                      |
+| ------------------------- | -------------------------------- |
+| `bun run start`           | Run MCP server (stdio)           |
+| `bun run dev`             | Run with `--watch`               |
+| `bun run ui`              | Launch MCP Inspector (web UI)    |
+| `bun run check`           | Biome + tsc (CI gate)            |
+| `bun run docker:build`    | Build Docker image (native arch) |
+| `bun run docker:build:ci` | Build Docker image (linux/amd64) |
+
+### Adding a Command
+
+1. Add entry to `GOVC_COMMAND_INDEX` in `src/commands.ts`.
+2. Add `GovcToolDef` to `GOVC_TOOL_DEFS` with typed flags.
+3. Generator wires it automatically.
+4. `bun run check`.
+
+## License
+
+MIT
