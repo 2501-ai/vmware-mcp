@@ -2,3 +2,5 @@ node_modules/
 dist/
 2501/
 *.log
+*.tar.gz
+.env

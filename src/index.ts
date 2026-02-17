@@ -1,140 +1,211 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import { execGovc } from './govc';
+import {
+  CallToolRequestSchema,
+  ListToolsRequestSchema,
+} from '@modelcontextprotocol/sdk/types.js';
+import { generateMCPTools } from './generator';
+import { searchCommands } from './search';
+import { execGovc, execGovcHelp, splitArgs } from './executor';
+import { startHttpServer } from './httpServer';
 
-// WHY: Using low-level Server API for direct request handler control
-// eslint-disable-next-line @typescript-eslint/no-deprecated
-const server = new Server({ name: 'mcp-govc', version: '1.0.0' }, { capabilities: { tools: {} } });
+// ---------------------------------------------------------------------------
+// Validate required env vars
+// ---------------------------------------------------------------------------
 
-server.setRequestHandler(ListToolsRequestSchema, () => {
+const REQUIRED_ENV = ['GOVC_URL', 'GOVC_USERNAME', 'GOVC_PASSWORD'];
+const missing = REQUIRED_ENV.filter((k) => !process.env[k]);
+
+if (missing.length) {
+  console.error(`✗ Missing required env vars: ${missing.join(', ')}`);
+  console.error('  Set GOVC_URL, GOVC_USERNAME, GOVC_PASSWORD (and optionally GOVC_INSECURE=true)');
+  process.exit(1);
+}
+
+console.error('✓ govc credentials configured');
+
+// ---------------------------------------------------------------------------
+// MCP Server
+// ---------------------------------------------------------------------------
+
+const server = new Server(
+  { name: 'mcp-govc-vcenter', version: '1.0.0' },
+  { capabilities: { tools: {} } },
+);
+
+// Generate typed tools from command definitions
+const typedTools = generateMCPTools();
+
+// ---------------------------------------------------------------------------
+// Built-in meta tools
+// ---------------------------------------------------------------------------
+
+const SEARCH_TOOL = {
+  name: 'govc_search',
+  description:
+    'Search through all ~300 available govc commands. Returns matching commands with descriptions. Use this to discover what govc can do before running commands.',
+  inputSchema: {
+    type: 'object' as const,
+    properties: {
+      query: {
+        type: 'string',
+        description: 'Search query (e.g. "vm power", "datastore", "snapshot", "cluster drs")',
+      },
+      limit: {
+        type: 'number',
+        description: 'Maximum number of results (default: 15)',
+      },
+    },
+    required: ['query'],
+  },
+};
+
+const HELP_TOOL = {
+  name: 'govc_help',
+  description:
+    'Get detailed help for a specific govc command including all flags, usage examples, and descriptions. Runs `govc <command> -h`.',
+  inputSchema: {
+    type: 'object' as const,
+    properties: {
+      command: {
+        type: 'string',
+        description: 'The govc command to get help for (e.g. "vm.info", "cluster.add", "snapshot.create")',
+      },
+    },
+    required: ['command'],
+  },
+};
+
+const RUN_TOOL = {
+  name: 'govc_run',
+  description:
+    'Run any govc command directly. This is the escape hatch for commands that don\'t have a dedicated typed tool. Use govc_search or govc_help to discover commands first.',
+  inputSchema: {
+    type: 'object' as const,
+    properties: {
+      command: {
+        type: 'string',
+        description: 'The govc sub-command (e.g. "vm.info", "host.esxcli", "find")',
+      },
+      flags: {
+        type: 'object',
+        description: 'Flag key-value pairs without leading dashes. Example: {"vm": "my-vm", "r": true}',
+        additionalProperties: true,
+      },
+      args: {
+        type: 'string',
+        description: 'Positional arguments as a space-separated string. Supports quoting.',
+      },
+      json: {
+        type: 'boolean',
+        description: 'Request JSON output (default: true). Set false for commands that don\'t support it.',
+      },
+    },
+    required: ['command'],
+  },
+};
+
+// ---------------------------------------------------------------------------
+// ListTools handler
+// ---------------------------------------------------------------------------
+
+server.setRequestHandler(ListToolsRequestSchema, async (request) => {
+  const { cursor } = request.params || {};
+  const pageSize = 400;
+
+  const allTools = [
+    SEARCH_TOOL,
+    HELP_TOOL,
+    RUN_TOOL,
+    ...typedTools.map(({ name, description, inputSchema }) => ({
+      name,
+      description,
+      inputSchema,
+    })),
+  ];
+
+  const startIndex = cursor ? parseInt(cursor, 10) : 0;
+  const endIndex = Math.min(startIndex + pageSize, allTools.length);
+  const paginatedTools = allTools.slice(startIndex, endIndex);
+  const nextCursor = endIndex < allTools.length ? endIndex.toString() : undefined;
+
   return {
-    tools: [
-      {
-        name: 'govc',
-        description:
-          'Execute any govc subcommand against a vSphere environment. ' +
-          'Pass the subcommand and its arguments as separate strings. ' +
-          'Example: subcommand "vm.info", args ["/DC/vm/myvm"].',
-        inputSchema: {
-          type: 'object' as const,
-          properties: {
-            subcommand: {
-              type: 'string',
-              description: 'The govc subcommand to run (e.g. "about", "vm.info", "ls").',
-            },
-            args: {
-              type: 'array',
-              items: { type: 'string' },
-              description: 'Optional arguments for the subcommand.',
-            },
-          },
-          required: ['subcommand'],
-        },
-      },
-      {
-        name: 'govc_commands',
-        description:
-          'List all available govc subcommands. ' +
-          'Use this to discover what operations are available before calling govc.',
-        inputSchema: {
-          type: 'object' as const,
-          properties: {},
-        },
-      },
-      {
-        name: 'govc_help',
-        description: 'Get detailed help for a specific govc subcommand, including available flags and usage.',
-        inputSchema: {
-          type: 'object' as const,
-          properties: {
-            subcommand: {
-              type: 'string',
-              description: 'The govc subcommand to get help for (e.g. "vm.info").',
-            },
-          },
-          required: ['subcommand'],
-        },
-      },
-    ],
+    tools: paginatedTools,
+    ...(nextCursor && { nextCursor }),
   };
 });
 
+// ---------------------------------------------------------------------------
+// CallTool handler
+// ---------------------------------------------------------------------------
+
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  const { name, arguments: args } = request.params;
+  const { name, arguments: args = {} } = request.params;
 
-  switch (name) {
-    case 'govc': {
-      const subcommand = args?.subcommand as string;
-      if (!subcommand) {
-        return { content: [{ type: 'text', text: 'Error: subcommand is required.' }] };
-      }
-      const cmdArgs = (args?.args as string[]) ?? [];
-      const result = await execGovc([subcommand, ...cmdArgs]);
-
-      let text = '';
-      if (result.stdout) text += result.stdout;
-      if (result.stderr) text += (text ? '\n' : '') + result.stderr;
-      if (!text) text = `Command completed with exit code ${String(result.exitCode)}.`;
-      if (result.exitCode !== 0 && !result.stderr) {
-        text += `\nExit code: ${String(result.exitCode)}`;
-      }
-
-      return { content: [{ type: 'text', text }] };
-    }
-
-    case 'govc_commands': {
-      const result = await execGovc(['-h']);
-      // govc -h prints help to stderr
-      const output = result.stderr || result.stdout;
-
-      // Parse the command list from help output
-      const lines = output.split('\n');
-      const commands: string[] = [];
-      let inCommands = false;
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (trimmed === 'Available commands:' || trimmed.startsWith('Commands:')) {
-          inCommands = true;
-          continue;
-        }
-        if (inCommands) {
-          if (trimmed === '' || trimmed.startsWith('Use ') || trimmed.startsWith('Flags:')) {
-            break;
-          }
-          if (trimmed) {
-            commands.push(trimmed);
-          }
-        }
-      }
-
-      const text = commands.length > 0 ? commands.join('\n') : output; // Fallback: return raw help output
-
-      return { content: [{ type: 'text', text }] };
-    }
-
-    case 'govc_help': {
-      const subcommand = args?.subcommand as string;
-      if (!subcommand) {
-        return { content: [{ type: 'text', text: 'Error: subcommand is required.' }] };
-      }
-      const result = await execGovc([subcommand, '-h']);
-      const text = result.stderr || result.stdout || `No help available for "${subcommand}".`;
-      return { content: [{ type: 'text', text }] };
-    }
-
-    default:
-      return { content: [{ type: 'text', text: `Unknown tool: ${name}` }] };
+  // -- govc_search --
+  if (name === 'govc_search') {
+    const { query, limit = 15 } = args as { query: string; limit?: number };
+    const results = searchCommands(query, limit);
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({ query, results }, null, 2),
+        },
+      ],
+    };
   }
+
+  // -- govc_help --
+  if (name === 'govc_help') {
+    const { command } = args as { command: string };
+    const helpText = await execGovcHelp(command);
+    return {
+      content: [{ type: 'text', text: helpText }],
+    };
+  }
+
+  // -- govc_run (generic escape hatch) --
+  if (name === 'govc_run') {
+    const {
+      command,
+      flags = {},
+      args: positionalStr = '',
+      json = true,
+    } = args as {
+      command: string;
+      flags?: Record<string, unknown>;
+      args?: string;
+      json?: boolean;
+    };
+    const positional = positionalStr ? splitArgs(positionalStr) : [];
+    const result = await execGovc(command, flags as Record<string, unknown>, positional, json);
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+    };
+  }
+
+  // -- Typed tools --
+  const tool = typedTools.find((t) => t.name === name);
+  if (tool) {
+    const result = await tool.handler(args as Record<string, unknown>);
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+    };
+  }
+
+  throw new Error(`Unknown tool: ${name}`);
 });
+
+// ---------------------------------------------------------------------------
+// Main
+// ---------------------------------------------------------------------------
 
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error('mcp-govc server started on stdio');
+  console.error(`govc MCP server running on stdio (${typedTools.length} typed tools + 3 meta tools)`);
+  startHttpServer();
 }
 
-main().catch((err: unknown) => {
-  console.error('Fatal error:', err);
-  process.exit(1);
-});
+main().catch(console.error);

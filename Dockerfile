@@ -1,4 +1,4 @@
-# Stage 1: Get govc binary from official image
+# Stage 1: Get govc from official image
 FROM vmware/govc:v0.52.0 AS govc
 
 # Stage 2: Install dependencies
