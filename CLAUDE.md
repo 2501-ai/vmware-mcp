@@ -4,6 +4,8 @@
 
 - `bun run check` — **always run before committing** (biome + tsc)
 - `bun run ui` — MCP Inspector for local testing
+- `bun run docker:build` — build Docker image (native arch, local dev)
+- `bun run docker:build:ci` — build Docker image (linux/amd64, CI)
 
 ## Code Rules
 
@@ -23,7 +25,7 @@
 ## Git
 
 - **Never push to `main`**. Feature branch + PR.
-- **Never commit unless specificallty asked to**.
+- **Never commit unless specifically asked to**.
 - Always run `bun run check` before committing.
 - Branch: `feature/<x>` or `fix/<x>`.
 - Commits: conventional (`feat:`, `fix:`, `refactor:`, `chore:`).
