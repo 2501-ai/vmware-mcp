@@ -10,7 +10,7 @@
     "format": "biome format --write .",
     "format:check": "biome format .",
     "lint": "biome lint .",
-    "docker:build": "DOCKER_BUILDKIT=1 docker buildx build --load --platform linux/amd64 -t vmware-mcp .",
+    "docker:build": "DOCKER_BUILDKIT=1 docker buildx build --load -t vmware-mcp .",
     "lint:fix": "biome lint --fix .",
     "typecheck": "tsc --noEmit",
     "check": "biome check . && tsc --noEmit"

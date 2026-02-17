@@ -4,3 +4,4 @@ dist/
 *.log
 *.tar.gz
 .env
+.env.*

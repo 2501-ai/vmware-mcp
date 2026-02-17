@@ -23,6 +23,8 @@
 ## Git
 
 - **Never push to `main`**. Feature branch + PR.
+- **Never commit unless specificallty asked to**.
+- Always run `bun run check` before committing.
 - Branch: `feature/<x>` or `fix/<x>`.
 - Commits: conventional (`feat:`, `fix:`, `refactor:`, `chore:`).
 
