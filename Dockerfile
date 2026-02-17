@@ -1,12 +1,7 @@
-# Stage 1: Install govc
-FROM alpine:3.21 AS govc-builder
-ARG GOVC_VERSION=0.52.0
-ARG TARGETARCH
-RUN wget -qO- "https://github.com/vmware/govmomi/releases/download/v${GOVC_VERSION}/govc_Linux_$(uname -m).tar.gz" \
-    | tar xzf - -C /usr/local/bin govc \
-    && chmod +x /usr/local/bin/govc
+# Stage 1: Get govc binary from official image
+FROM vmware/govc:v0.52.0 AS govc
 
-# Stage 2: Build the MCP server
+# Stage 2: Install dependencies
 FROM oven/bun:1 AS builder
 WORKDIR /app
 COPY package.json bun.lock ./
@@ -17,7 +12,7 @@ COPY src/ ./src/
 FROM oven/bun:1-alpine
 WORKDIR /app
 
-COPY --from=govc-builder /usr/local/bin/govc /usr/local/bin/govc
+COPY --from=govc /govc /usr/local/bin/govc
 COPY --from=builder /app ./
 
 ENTRYPOINT ["bun", "run", "src/index.ts"]
