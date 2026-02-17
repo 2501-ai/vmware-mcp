@@ -1,4 +1,5 @@
 import type { GovcToolDef } from './commands';
+import { sanitize } from './sanitizer';
 
 export interface GovcResult {
   success: boolean;
@@ -109,7 +110,9 @@ export const execGovc = async (
 
     if (json && raw) {
       try {
-        return { success: true, exitCode: 0, data: JSON.parse(raw) };
+        const parsed: unknown = JSON.parse(raw);
+        const data = sanitize(parsed) ?? parsed;
+        return { success: true, exitCode: 0, data };
       } catch {
         // Not valid JSON – some commands don't support -json, return raw
       }
