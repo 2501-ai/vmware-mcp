@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-**govc-mcp** is an MCP (Model Context Protocol) server that wraps VMware's `govc` CLI tool, exposing vSphere operations as typed MCP tools for AI agents. It runs on **Bun** and communicates over stdio.
+**VMWare MCP** is an MCP (Model Context Protocol) server that wraps VMware's `govc` CLI tool, exposing vSphere operations as typed MCP tools for AI agents. It runs on **Bun** and communicates over stdio.
 
 ## Commands
 
@@ -10,6 +10,7 @@
 bun install              # Install dependencies
 bun run start            # Run the MCP server (requires GOVC_* env vars)
 bun run dev              # Run with --watch for development
+bun run ui               # Launch MCP Inspector (web UI for testing tools)
 bun run check            # Run biome check + tsc --noEmit (the full CI gate)
 bun run lint             # Biome lint only
 bun run lint:fix         # Biome lint with auto-fix
@@ -64,12 +65,52 @@ All source code lives in `src/`:
 
 ## Environment Variables
 
+Create a `.env` file at the project root (already in `.gitignore`). The `export` prefix is intentional so `source .env` works for direct `govc` CLI usage — Bun (≥ 1.0.22) handles it fine:
+
+```bash
+export GOVC_URL=https://vcenter.example.com/sdk
+export GOVC_USERNAME=admin@vsphere.local
+export GOVC_PASSWORD=secret
+export GOVC_INSECURE=1
+```
+
 Required at runtime:
-- `GOVC_URL` — vCenter URL (e.g., `https://vcenter.example.com/sdk`)
-- `GOVC_USERNAME` — vCenter username
-- `GOVC_PASSWORD` — vCenter password
-- `GOVC_INSECURE` — Set to `true` to skip TLS verification (optional)
+
+- `GOVC_URL` — vCenter / ESXi SDK URL
+- `GOVC_USERNAME` — vSphere username
+- `GOVC_PASSWORD` — vSphere password
 
 Optional:
+
+- `GOVC_INSECURE` — Set to `1` to skip TLS verification
 - `GOVC_BIN` — Path to govc binary (default: `govc`)
 - `GOVC_TIMEOUT_MS` — Subprocess timeout in ms (default: `120000`)
+
+## SSH Tunnel (remote vCenter)
+
+If vCenter is only reachable from an internal network via a jump host:
+
+```bash
+# Terminal 1 — open the tunnel (keeps running in foreground)
+sudo ssh -J <jump_user>@<jump_host> -L 443:<vcenter_host>:443 <user>@<internal_host> -N
+
+# Then in .env:
+# export GOVC_URL=https://localhost/sdk
+```
+
+To avoid `sudo`, use a high local port:
+
+```bash
+ssh -J <jump_user>@<jump_host> -L 8443:<vcenter_host>:443 <user>@<internal_host> -N
+
+# Then in .env:
+# export GOVC_URL=https://localhost:8443/sdk
+```
+
+`GOVC_INSECURE=1` is required when tunnelling since the TLS cert won't match `localhost`.
+
+## Testing Locally
+
+1. Fill in `.env` and `source .env`.
+2. Verify govc works directly: `govc about`.
+3. Launch the MCP Inspector: `bun run ui` — this opens a web UI to browse tools, call them, and inspect responses.

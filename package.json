@@ -1,15 +1,16 @@
 {
-  "name": "mcp-govc",
+  "name": "vmware-mcp",
   "version": "1.0.0",
   "type": "module",
   "main": "src/index.ts",
   "scripts": {
     "start": "bun run src/index.ts",
+    "ui": "npx @modelcontextprotocol/inspector bun run start",
     "dev": "bun --watch run src/index.ts",
     "format": "biome format --write .",
     "format:check": "biome format .",
     "lint": "biome lint .",
-    "docker:build": "DOCKER_BUILDKIT=1 docker buildx build --load --platform linux/amd64 -t mcp-govc-vcenter .",
+    "docker:build": "DOCKER_BUILDKIT=1 docker buildx build --load --platform linux/amd64 -t vmware-mcp .",
     "lint:fix": "biome lint --fix .",
     "typecheck": "tsc --noEmit",
     "check": "biome check . && tsc --noEmit"

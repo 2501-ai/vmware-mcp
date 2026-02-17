@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// govc MCP – Command Registry
+// VMWare MCP – Command Registry
 // ---------------------------------------------------------------------------
 // Two data structures:
 //   1. GOVC_COMMAND_INDEX  – agent-required commands (name + description) for search
