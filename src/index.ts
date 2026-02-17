@@ -2,6 +2,7 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { execGovc, execGovcHelp, splitArgs } from './executor';
+import { formatForLLM } from './formatter';
 import { generateMCPTools } from './generator';
 import { startHttpServer } from './httpServer';
 import { searchCommands } from './search';
@@ -144,7 +145,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       content: [
         {
           type: 'text',
-          text: JSON.stringify({ query, results }, null, 2),
+          text: formatForLLM({ query, results }),
         },
       ],
     };
@@ -175,7 +176,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const positional = positionalStr ? splitArgs(positionalStr) : [];
     const result = await execGovc(command, flags as Record<string, unknown>, positional, json);
     return {
-      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      content: [{ type: 'text', text: formatForLLM(result) }],
     };
   }
 
@@ -184,7 +185,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   if (tool) {
     const result = await tool.handler(args as Record<string, unknown>);
     return {
-      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      content: [{ type: 'text', text: formatForLLM(result) }],
     };
   }
 
