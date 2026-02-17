@@ -45,7 +45,7 @@ const DS = { ds: str('Datastore [GOVC_DATASTORE]') };
 const CLUSTER = { cluster: str('Cluster [GOVC_CLUSTER]') };
 const FOLDER = { folder: str('Inventory folder [GOVC_FOLDER]') };
 const POOL = { pool: str('Resource pool [GOVC_RESOURCE_POOL]') };
-const NET = { net: str('Network [GOVC_NETWORK]') };
+const _NET = { net: str('Network [GOVC_NETWORK]') };
 
 // ---------------------------------------------------------------------------
 // 1. GOVC_COMMAND_INDEX – full catalogue for search
@@ -67,7 +67,11 @@ export const GOVC_COMMAND_INDEX: GovcCommandEntry[] = [
   { name: 'vm.create', description: 'Create VM', category: 'vm' },
   { name: 'vm.destroy', description: 'Power off and delete VM', category: 'vm' },
   { name: 'vm.clone', description: 'Clone VM or template to NAME', category: 'vm' },
-  { name: 'vm.power', description: 'Invoke VM power operations (on/off/reset/suspend/reboot/shutdown)', category: 'vm' },
+  {
+    name: 'vm.power',
+    description: 'Invoke VM power operations (on/off/reset/suspend/reboot/shutdown)',
+    category: 'vm',
+  },
   { name: 'vm.change', description: 'Change VM configuration (CPU, memory, ExtraConfig, etc.)', category: 'vm' },
   { name: 'vm.ip', description: 'List IPs for VM', category: 'vm' },
   { name: 'vm.migrate', description: 'Migrate VM to a specific resource pool, host or datastore', category: 'vm' },
@@ -200,7 +204,11 @@ export const GOVC_COMMAND_INDEX: GovcCommandEntry[] = [
   { name: 'cluster.group.change', description: 'Set cluster group members', category: 'cluster' },
   { name: 'cluster.group.ls', description: 'List cluster groups and members', category: 'cluster' },
   { name: 'cluster.group.remove', description: 'Remove cluster group', category: 'cluster' },
-  { name: 'cluster.rule.create', description: 'Create cluster rule (affinity, anti-affinity, vm-host)', category: 'cluster' },
+  {
+    name: 'cluster.rule.create',
+    description: 'Create cluster rule (affinity, anti-affinity, vm-host)',
+    category: 'cluster',
+  },
   { name: 'cluster.rule.change', description: 'Change cluster rule', category: 'cluster' },
   { name: 'cluster.rule.info', description: 'Cluster rule detailed info', category: 'cluster' },
   { name: 'cluster.rule.ls', description: 'List cluster rules and members', category: 'cluster' },
@@ -220,10 +228,18 @@ export const GOVC_COMMAND_INDEX: GovcCommandEntry[] = [
   { name: 'cluster.draft.ls', description: 'List software drafts', category: 'cluster' },
   { name: 'cluster.draft.rm', description: 'Discard software draft', category: 'cluster' },
   { name: 'cluster.draft.commit', description: 'Commit software draft', category: 'cluster' },
-  { name: 'cluster.draft.baseimage.info', description: 'Display base image version of software draft', category: 'cluster' },
+  {
+    name: 'cluster.draft.baseimage.info',
+    description: 'Display base image version of software draft',
+    category: 'cluster',
+  },
   { name: 'cluster.draft.baseimage.set', description: 'Set ESXi base image on software draft', category: 'cluster' },
   { name: 'cluster.draft.component.add', description: 'Add component to software draft', category: 'cluster' },
-  { name: 'cluster.draft.component.info', description: 'Display component details in software draft', category: 'cluster' },
+  {
+    name: 'cluster.draft.component.info',
+    description: 'Display component details in software draft',
+    category: 'cluster',
+  },
   { name: 'cluster.draft.component.ls', description: 'List components in software draft', category: 'cluster' },
   { name: 'cluster.draft.component.rm', description: 'Remove component from software draft', category: 'cluster' },
 
@@ -495,9 +511,21 @@ export const GOVC_COMMAND_INDEX: GovcCommandEntry[] = [
   { name: 'namespace.service.info', description: 'Get Supervisor Service info', category: 'namespace' },
   { name: 'namespace.service.ls', description: 'List Supervisor Services', category: 'namespace' },
   { name: 'namespace.service.rm', description: 'Remove Supervisor Service', category: 'namespace' },
-  { name: 'namespace.service.version.activate', description: 'Activate Supervisor Service version', category: 'namespace' },
-  { name: 'namespace.service.version.create', description: 'Register new Supervisor Service version', category: 'namespace' },
-  { name: 'namespace.service.version.deactivate', description: 'Deactivate Supervisor Service version', category: 'namespace' },
+  {
+    name: 'namespace.service.version.activate',
+    description: 'Activate Supervisor Service version',
+    category: 'namespace',
+  },
+  {
+    name: 'namespace.service.version.create',
+    description: 'Register new Supervisor Service version',
+    category: 'namespace',
+  },
+  {
+    name: 'namespace.service.version.deactivate',
+    description: 'Deactivate Supervisor Service version',
+    category: 'namespace',
+  },
   { name: 'namespace.service.version.info', description: 'Get Supervisor Service version info', category: 'namespace' },
   { name: 'namespace.service.version.ls', description: 'List Supervisor Service versions', category: 'namespace' },
   { name: 'namespace.service.version.rm', description: 'Remove Supervisor Service version', category: 'namespace' },
@@ -557,7 +585,8 @@ export const GOVC_TOOL_DEFS: GovcToolDef[] = [
   },
   {
     command: 'ls',
-    description: 'List inventory items. PATH defaults to current datacenter. Supports type aliases: m=VirtualMachine, h=HostSystem, s=Datastore, c=ClusterComputeResource, etc.',
+    description:
+      'List inventory items. PATH defaults to current datacenter. Supports type aliases: m=VirtualMachine, h=HostSystem, s=Datastore, c=ClusterComputeResource, etc.',
     flags: {
       l: bool('Long listing format'),
       t: str('Object type filter (e.g. m, h, s, c, d, f, n, p, r, w, g, a)'),
@@ -568,7 +597,8 @@ export const GOVC_TOOL_DEFS: GovcToolDef[] = [
   },
   {
     command: 'find',
-    description: 'Find managed objects by type, name, or property. ROOT defaults to current datacenter. Type aliases: m=VirtualMachine, h=HostSystem, s=Datastore, c=ClusterComputeResource, etc.',
+    description:
+      'Find managed objects by type, name, or property. ROOT defaults to current datacenter. Type aliases: m=VirtualMachine, h=HostSystem, s=Datastore, c=ClusterComputeResource, etc.',
     flags: {
       type: str('Resource type filter'),
       name: str('Resource name glob pattern (default: *)'),
@@ -614,7 +644,10 @@ export const GOVC_TOOL_DEFS: GovcToolDef[] = [
     command: 'vm.create',
     description: 'Create VM. Use -on=false to create without powering on.',
     flags: {
-      ...DS, ...FOLDER, ...HOST, ...POOL,
+      ...DS,
+      ...FOLDER,
+      ...HOST,
+      ...POOL,
       c: num('Number of CPUs'),
       m: num('Size in MB of memory'),
       g: str('Guest OS ID (e.g. ubuntu64Guest, windows9_64Guest)'),
@@ -641,7 +674,11 @@ export const GOVC_TOOL_DEFS: GovcToolDef[] = [
     command: 'vm.clone',
     description: 'Clone VM or template to NAME.',
     flags: {
-      ...VM, ...DS, ...FOLDER, ...HOST, ...POOL,
+      ...VM,
+      ...DS,
+      ...FOLDER,
+      ...HOST,
+      ...POOL,
       c: num('Number of CPUs'),
       m: num('Size in MB of memory'),
       on: bool('Power on VM (default: true)'),
@@ -703,7 +740,10 @@ export const GOVC_TOOL_DEFS: GovcToolDef[] = [
     command: 'vm.migrate',
     description: 'Migrate VM to a specific resource pool, host or datastore.',
     flags: {
-      ...VM, ...DS, ...HOST, ...POOL,
+      ...VM,
+      ...DS,
+      ...HOST,
+      ...POOL,
       net: str('Network [GOVC_NETWORK]'),
       priority: str('Task priority (defaultPriority)'),
     },
@@ -1044,7 +1084,10 @@ export const GOVC_TOOL_DEFS: GovcToolDef[] = [
     command: 'library.deploy',
     description: 'Deploy library OVF template.',
     flags: {
-      ...DS, ...FOLDER, ...HOST, ...POOL,
+      ...DS,
+      ...FOLDER,
+      ...HOST,
+      ...POOL,
       options: str('Options spec file path for VM deployment'),
     },
     positionalArgs: 'TEMPLATE [NAME]',
@@ -1208,7 +1251,10 @@ export const GOVC_TOOL_DEFS: GovcToolDef[] = [
     command: 'import.ova',
     description: 'Import OVA.',
     flags: {
-      ...DS, ...FOLDER, ...HOST, ...POOL,
+      ...DS,
+      ...FOLDER,
+      ...HOST,
+      ...POOL,
       name: str('Name for new entity'),
       net: str('Network'),
       options: str('Options spec file path'),

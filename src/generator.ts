@@ -1,32 +1,23 @@
-import { type GovcToolDef, GOVC_TOOL_DEFS } from './commands';
-import { makeHandler } from './executor';
+import { GOVC_TOOL_DEFS, type GovcToolDef } from './commands';
+import { type GovcResult, makeHandler } from './executor';
 
 export interface MCPTool {
   name: string;
   description: string;
   inputSchema: {
     type: string;
-    properties: Record<string, any>;
+    properties: Record<string, unknown>;
     required?: string[];
   };
-  handler: (args: Record<string, unknown>) => Promise<any>;
+  handler: (args: Record<string, unknown>) => Promise<GovcResult>;
 }
 
 /** govc command name → valid MCP tool name: dots → underscores */
 const toToolName = (command: string): string => command.replace(/\./g, '_');
 
-const flagToJsonSchema = (flag: {
-  type: string;
-  description: string;
-  enum?: string[];
-}): Record<string, unknown> => {
+const flagToJsonSchema = (flag: { type: string; description: string; enum?: string[] }): Record<string, unknown> => {
   const schema: Record<string, unknown> = {
-    type:
-      flag.type === 'boolean'
-        ? 'boolean'
-        : flag.type === 'number'
-          ? 'number'
-          : 'string',
+    type: flag.type === 'boolean' ? 'boolean' : flag.type === 'number' ? 'number' : 'string',
     description: flag.description,
   };
   if (flag.enum) schema.enum = flag.enum;
@@ -34,7 +25,7 @@ const flagToJsonSchema = (flag: {
 };
 
 const generateTool = (def: GovcToolDef): MCPTool => {
-  const properties: Record<string, any> = {};
+  const properties: Record<string, unknown> = {};
   const required: string[] = [];
 
   for (const [key, flag] of Object.entries(def.flags)) {
@@ -43,7 +34,7 @@ const generateTool = (def: GovcToolDef): MCPTool => {
   }
 
   if (def.positionalArgs) {
-    properties['_args'] = {
+    properties._args = {
       type: 'string',
       description: `Positional arguments: ${def.positionalArgs}. Space-separated values.`,
     };
@@ -61,5 +52,4 @@ const generateTool = (def: GovcToolDef): MCPTool => {
   };
 };
 
-export const generateMCPTools = (): MCPTool[] =>
-  GOVC_TOOL_DEFS.map(generateTool);
+export const generateMCPTools = (): MCPTool[] => GOVC_TOOL_DEFS.map(generateTool);

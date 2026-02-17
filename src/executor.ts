@@ -1,9 +1,9 @@
-import { type GovcToolDef } from './commands';
+import type { GovcToolDef } from './commands';
 
 export interface GovcResult {
   success: boolean;
   exitCode: number;
-  data?: any;
+  data?: unknown;
   raw?: string;
   error?: string;
 }
@@ -17,11 +17,7 @@ const EXEC_TIMEOUT_MS = parseInt(process.env.GOVC_TIMEOUT_MS || '120000', 10);
  * - boolean false → `-flag=false`
  * - string/number → `-flag value`
  */
-const buildArgs = (
-  flags: Record<string, unknown>,
-  positional: string[],
-  json: boolean
-): string[] => {
+const buildArgs = (flags: Record<string, unknown>, positional: string[], json: boolean): string[] => {
   const args: string[] = [];
 
   if (json) args.push('-json');
@@ -74,7 +70,7 @@ export const execGovc = async (
   command: string,
   flags: Record<string, unknown> = {},
   positional: string[] = [],
-  json = true
+  json = true,
 ): Promise<GovcResult> => {
   const args = [GOVC_BIN, command, ...buildArgs(flags, positional, json)];
 
@@ -92,15 +88,11 @@ export const execGovc = async (
       setTimeout(() => {
         proc.kill();
         reject(new Error(`govc timed out after ${EXEC_TIMEOUT_MS}ms`));
-      }, EXEC_TIMEOUT_MS)
+      }, EXEC_TIMEOUT_MS),
     );
 
     const [exitCode, stdoutText, stderrText] = await Promise.race([
-      Promise.all([
-        proc.exited,
-        new Response(proc.stdout).text(),
-        new Response(proc.stderr).text(),
-      ]),
+      Promise.all([proc.exited, new Response(proc.stdout).text(), new Response(proc.stderr).text()]),
       timeout,
     ]);
 
@@ -144,10 +136,7 @@ export const execGovcHelp = async (command: string): Promise<string> => {
       stderr: 'pipe',
     });
 
-    const [stdout, stderr] = await Promise.all([
-      new Response(proc.stdout).text(),
-      new Response(proc.stderr).text(),
-    ]);
+    const [stdout, stderr] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
 
     // govc prints help to stderr
     return (stderr + stdout).trim() || `No help available for '${command}'`;
@@ -159,19 +148,18 @@ export const execGovcHelp = async (command: string): Promise<string> => {
 /**
  * Build an MCP tool handler for a given GovcToolDef.
  */
-export const makeHandler =
-  (def: GovcToolDef) => async (args: Record<string, unknown>) => {
-    const flags: Record<string, unknown> = {};
-    const positional: string[] = [];
+export const makeHandler = (def: GovcToolDef) => async (args: Record<string, unknown>) => {
+  const flags: Record<string, unknown> = {};
+  const positional: string[] = [];
 
-    for (const [key, val] of Object.entries(args)) {
-      if (key === '_args') {
-        const raw = String(val).trim();
-        if (raw) positional.push(...splitArgs(raw));
-      } else if (key in def.flags) {
-        flags[key] = val;
-      }
+  for (const [key, val] of Object.entries(args)) {
+    if (key === '_args') {
+      const raw = String(val).trim();
+      if (raw) positional.push(...splitArgs(raw));
+    } else if (key in def.flags) {
+      flags[key] = val;
     }
+  }
 
-    return execGovc(def.command, flags, positional);
-  };
+  return execGovc(def.command, flags, positional);
+};

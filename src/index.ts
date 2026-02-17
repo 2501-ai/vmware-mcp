@@ -1,13 +1,10 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-} from '@modelcontextprotocol/sdk/types.js';
-import { generateMCPTools } from './generator';
-import { searchCommands } from './search';
+import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { execGovc, execGovcHelp, splitArgs } from './executor';
+import { generateMCPTools } from './generator';
 import { startHttpServer } from './httpServer';
+import { searchCommands } from './search';
 
 // ---------------------------------------------------------------------------
 // Validate required env vars
@@ -28,10 +25,7 @@ console.error('✓ govc credentials configured');
 // MCP Server
 // ---------------------------------------------------------------------------
 
-const server = new Server(
-  { name: 'mcp-govc-vcenter', version: '1.0.0' },
-  { capabilities: { tools: {} } },
-);
+const server = new Server({ name: 'mcp-govc-vcenter', version: '1.0.0' }, { capabilities: { tools: {} } });
 
 // Generate typed tools from command definitions
 const typedTools = generateMCPTools();
@@ -79,7 +73,7 @@ const HELP_TOOL = {
 const RUN_TOOL = {
   name: 'govc_run',
   description:
-    'Run any govc command directly. This is the escape hatch for commands that don\'t have a dedicated typed tool. Use govc_search or govc_help to discover commands first.',
+    "Run any govc command directly. This is the escape hatch for commands that don't have a dedicated typed tool. Use govc_search or govc_help to discover commands first.",
   inputSchema: {
     type: 'object' as const,
     properties: {
@@ -98,7 +92,7 @@ const RUN_TOOL = {
       },
       json: {
         type: 'boolean',
-        description: 'Request JSON output (default: true). Set false for commands that don\'t support it.',
+        description: "Request JSON output (default: true). Set false for commands that don't support it.",
       },
     },
     required: ['command'],

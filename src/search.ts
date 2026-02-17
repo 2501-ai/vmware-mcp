@@ -11,12 +11,7 @@ const fuse = new Fuse<GovcCommandEntry>(GOVC_COMMAND_INDEX, {
   includeScore: true,
 });
 
-export const searchCommands = (
-  query: string,
-  limit = 15
-): GovcCommandEntry[] =>
-  fuse
-    .search(query, { limit })
-    .map((r) => r.item);
+export const searchCommands = (query: string, limit = 15): GovcCommandEntry[] =>
+  fuse.search(query, { limit }).map((r) => r.item);
 
 export { fuse };
