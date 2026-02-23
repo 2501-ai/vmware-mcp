@@ -211,6 +211,14 @@ async function main() {
   await server.connect(transport);
   console.error(`VMWare MCP server running on stdio (${typedTools.length} typed tools + 3 meta tools)`);
   startHttpServer();
+
+  // The MCP SDK's StdioServerTransport does not handle stdin EOF,
+  // so we listen directly. Without this the health-check server
+  // keeps the event loop alive and the container never exits.
+  process.stdin.on('end', () => {
+    console.error('stdin closed, shutting down…');
+    process.exit(0);
+  });
 }
 
 main().catch(console.error);

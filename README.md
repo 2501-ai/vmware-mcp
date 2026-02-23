@@ -1,6 +1,8 @@
 # VMWare MCP
 
-An [MCP](https://modelcontextprotocol.io/) server that gives AI agents direct access to your VMware vSphere infrastructure. Built on top of [`govc`](https://github.com/vmware/govmomi/tree/main/govc), it exposes **55 typed tools** covering VM lifecycle, snapshots, datastores, networking, and more.
+An [MCP](https://modelcontextprotocol.io/) server that gives AI agents direct access to your VMware vSphere infrastructure. Built on top of [`govc`](https://github.com/vmware/govmomi/tree/main/govc), it exposes **55 typed tools** covering VM lifecycle, snapshots, datastores, networking, and more — with additional tools being added over time.
+
+Tool output is formatted in [TOON](https://github.com/toon-format/spec) for token-efficient LLM consumption, with automatic JSON fallback.
 
 ## Available Tools
 
@@ -20,12 +22,38 @@ An [MCP](https://modelcontextprotocol.io/) server that gives AI agents direct ac
 
 Plus **3 meta tools**: `govc_search` (fuzzy search across all commands), `govc_help` (get help for any command), and `govc_run` (escape hatch for any govc command).
 
-## Quick Start — Docker
+First, copy and fill in your credentials:
 
 ```bash
-cp .env.docker.example .env.docker  # fill in your credentials
-docker run --rm -i --name vmware-mcp --env-file .env.docker ghcr.io/2501-ai/vmware-mcp
+cp .env.docker.example .env.docker   # edit with your vCenter URL, username & password
 ```
+
+## Quick Start — Ephemeral
+
+A fresh container per connection, removed when done.
+
+```bash
+# Docker
+docker run --rm -i --env-file .env.docker ghcr.io/2501-ai/vmware-mcp
+
+# Claude Code
+claude mcp add vmware-mcp -- docker run --rm -i --env-file .env.docker ghcr.io/2501-ai/vmware-mcp
+```
+
+## Quick Start — Persistent
+
+The container runs as a long-lived service. Clients connect via `docker exec`.
+
+```bash
+# Docker (once)
+docker run -d --name vmware-mcp --restart unless-stopped \
+  --env-file .env.docker -e MCP_KEEP_ALIVE=true ghcr.io/2501-ai/vmware-mcp
+
+# Claude Code
+claude mcp add vmware-mcp -- docker exec -i vmware-mcp vmware-mcp
+```
+
+> Restart Claude Code after running `claude mcp add`. Tools appear as `mcp__vmware-mcp__*`. Check status with `/mcp`.
 
 ## Quick Start — From Source
 
@@ -34,10 +62,14 @@ git clone https://github.com/2501-ai/vmware-mcp.git
 cd vmware-mcp
 bun install
 cp .env.example .env  # fill in your credentials
-bun run ui  # opens MCP Inspector in your browser
+bun run start          # run the MCP server over stdio
 ```
 
-> To wire the server into an MCP client directly, see the [Scripts](#scripts) section.
+To explore and test tools interactively, you can use the [MCP Inspector](https://github.com/modelcontextprotocol/inspector) instead:
+
+```bash
+bun run ui
+```
 
 ## Configuration
 
@@ -49,6 +81,7 @@ bun run ui  # opens MCP Inspector in your browser
 | `GOVC_INSECURE`   |          | Set `1` to skip TLS verification                                |
 | `GOVC_BIN`        |          | Path to `govc` binary (default: `govc`)                         |
 | `GOVC_TIMEOUT_MS` |          | Subprocess timeout in ms (default: `120000`)                    |
+| `MCP_KEEP_ALIVE`  |          | Set `true` for persistent container mode (see above)            |
 
 ## SSH Tunnel
 

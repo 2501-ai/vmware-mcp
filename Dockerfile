@@ -21,4 +21,12 @@ WORKDIR /app
 COPY --from=govc-builder /usr/local/bin/govc /usr/local/bin/govc
 COPY --from=builder /app ./
 
-ENTRYPOINT ["bun", "run", "src/index.ts"]
+# MCP stdio server — used by both modes
+RUN printf '#!/bin/sh\nexec bun run /app/src/index.ts\n' > /usr/local/bin/vmware-mcp && \
+    chmod +x /usr/local/bin/vmware-mcp
+
+# Entrypoint switches between ephemeral (default) and persistent (MCP_KEEP_ALIVE=true)
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+ENTRYPOINT ["entrypoint.sh"]
