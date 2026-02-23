@@ -17,7 +17,7 @@ const toToolName = (command: string): string => command.replace(/\./g, '_');
 
 const flagToJsonSchema = (flag: { type: string; description: string; enum?: string[] }): Record<string, unknown> => {
   const schema: Record<string, unknown> = {
-    type: flag.type === 'boolean' ? 'boolean' : flag.type === 'number' ? 'number' : 'string',
+    type: flag.type,
     description: flag.description,
   };
   if (flag.enum) schema.enum = flag.enum;

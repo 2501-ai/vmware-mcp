@@ -31,6 +31,9 @@ const server = new Server({ name: 'vmware-mcp', version: '1.0.0' }, { capabiliti
 // Generate typed tools from command definitions
 const typedTools = generateMCPTools();
 
+// O(1) lookup map for typed tools (#8)
+const toolMap = new Map(typedTools.map((t) => [t.name, t]));
+
 // ---------------------------------------------------------------------------
 // Built-in meta tools
 // ---------------------------------------------------------------------------
@@ -173,15 +176,22 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       args?: string;
       json?: boolean;
     };
+
+    // Strip leading dashes from flag keys defensively (#10)
+    const cleanFlags: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(flags)) {
+      cleanFlags[key.replace(/^-+/, '')] = val;
+    }
+
     const positional = positionalStr ? splitArgs(positionalStr) : [];
-    const result = await execGovc(command, flags as Record<string, unknown>, positional, json);
+    const result = await execGovc(command, cleanFlags, positional, json);
     return {
       content: [{ type: 'text', text: formatForLLM(result) }],
     };
   }
 
-  // -- Typed tools --
-  const tool = typedTools.find((t) => t.name === name);
+  // -- Typed tools (O(1) Map lookup) --
+  const tool = toolMap.get(name);
   if (tool) {
     const result = await tool.handler(args as Record<string, unknown>);
     return {
