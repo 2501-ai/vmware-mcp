@@ -25,8 +25,4 @@ COPY --from=builder /app ./
 RUN printf '#!/bin/sh\nexec bun run /app/src/index.ts\n' > /usr/local/bin/vmware-mcp && \
     chmod +x /usr/local/bin/vmware-mcp
 
-# Entrypoint switches between ephemeral (default) and persistent (MCP_KEEP_ALIVE=true)
-COPY entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
-
-ENTRYPOINT ["entrypoint.sh"]
+ENTRYPOINT ["vmware-mcp"]

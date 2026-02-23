@@ -210,15 +210,29 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(`VMWare MCP server running on stdio (${typedTools.length} typed tools + 3 meta tools)`);
-  startHttpServer();
+  // Only start the health-check for the main container process (PID 1).
+  // Exec'd processes would fail to bind the port anyway.
+  if (process.pid === 1) {
+    startHttpServer();
+  }
 
   // The MCP SDK's StdioServerTransport does not handle stdin EOF,
   // so we listen directly. Without this the health-check server
   // keeps the event loop alive and the container never exits.
-  process.stdin.on('end', () => {
-    console.error('stdin closed, shutting down…');
-    process.exit(0);
-  });
+  //
+  // In persistent mode (MCP_KEEP_ALIVE=true), the main container process
+  // (PID 1) stays alive so clients can `docker exec` into it.
+  // Exec'd processes are never PID 1, so they always exit on stdin EOF.
+  const keepAlive = process.env.MCP_KEEP_ALIVE === 'true' || process.env.MCP_KEEP_ALIVE === '1';
+
+  if (keepAlive && process.pid === 1) {
+    console.error('Persistent mode — waiting for connections via `docker exec`');
+  } else {
+    process.stdin.on('end', () => {
+      console.error('stdin closed, shutting down…');
+      process.exit(0);
+    });
+  }
 }
 
 main().catch(console.error);
