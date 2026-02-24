@@ -77,20 +77,21 @@ export const execGovc = async (
 
   console.error(`[govc] ${args.join(' ')}`);
 
+  let timer: Timer | undefined;
+
   try {
     const proc = Bun.spawn(args, {
-      env: { ...process.env },
       stdout: 'pipe',
       stderr: 'pipe',
     });
 
-    // Race against timeout
-    const timeout = new Promise<never>((_, reject) =>
-      setTimeout(() => {
+    // Race against timeout — timer is cleaned up in `finally`
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
         proc.kill();
         reject(new Error(`govc timed out after ${EXEC_TIMEOUT_MS}ms`));
-      }, EXEC_TIMEOUT_MS),
-    );
+      }, EXEC_TIMEOUT_MS);
+    });
 
     const [exitCode, stdoutText, stderrText] = await Promise.race([
       Promise.all([proc.exited, new Response(proc.stdout).text(), new Response(proc.stderr).text()]),
@@ -125,26 +126,42 @@ export const execGovc = async (
       exitCode: -1,
       error: err instanceof Error ? err.message : 'Unknown error spawning govc',
     };
+  } finally {
+    clearTimeout(timer);
   }
 };
 
 /**
  * Get help text for a govc command (`govc <cmd> -h`).
+ * Uses the same timeout as `execGovc` to avoid hanging indefinitely.
  */
 export const execGovcHelp = async (command: string): Promise<string> => {
+  let timer: Timer | undefined;
+
   try {
     const proc = Bun.spawn([GOVC_BIN, command, '-h'], {
-      env: { ...process.env },
       stdout: 'pipe',
       stderr: 'pipe',
     });
 
-    const [stdout, stderr] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        proc.kill();
+        reject(new Error(`govc help timed out after ${EXEC_TIMEOUT_MS}ms`));
+      }, EXEC_TIMEOUT_MS);
+    });
+
+    const [stdout, stderr] = await Promise.race([
+      Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()]),
+      timeout,
+    ]);
 
     // govc prints help to stderr
     return (stderr + stdout).trim() || `No help available for '${command}'`;
   } catch {
     return `Failed to get help for '${command}'`;
+  } finally {
+    clearTimeout(timer);
   }
 };
 

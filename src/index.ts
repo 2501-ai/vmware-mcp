@@ -31,6 +31,9 @@ const server = new Server({ name: 'vmware-mcp', version: '1.0.0' }, { capabiliti
 // Generate typed tools from command definitions
 const typedTools = generateMCPTools();
 
+// O(1) lookup map for typed tools (#8)
+const toolMap = new Map(typedTools.map((t) => [t.name, t]));
+
 // ---------------------------------------------------------------------------
 // Built-in meta tools
 // ---------------------------------------------------------------------------
@@ -173,15 +176,22 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       args?: string;
       json?: boolean;
     };
+
+    // Strip leading dashes from flag keys defensively (#10)
+    const cleanFlags: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(flags)) {
+      cleanFlags[key.replace(/^-+/, '')] = val;
+    }
+
     const positional = positionalStr ? splitArgs(positionalStr) : [];
-    const result = await execGovc(command, flags as Record<string, unknown>, positional, json);
+    const result = await execGovc(command, cleanFlags, positional, json);
     return {
       content: [{ type: 'text', text: formatForLLM(result) }],
     };
   }
 
-  // -- Typed tools --
-  const tool = typedTools.find((t) => t.name === name);
+  // -- Typed tools (O(1) Map lookup) --
+  const tool = toolMap.get(name);
   if (tool) {
     const result = await tool.handler(args as Record<string, unknown>);
     return {
@@ -200,7 +210,29 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(`VMWare MCP server running on stdio (${typedTools.length} typed tools + 3 meta tools)`);
-  startHttpServer();
+  // Only start the health-check for the main container process (PID 1).
+  // Exec'd processes would fail to bind the port anyway.
+  if (process.pid === 1) {
+    startHttpServer();
+  }
+
+  // The MCP SDK's StdioServerTransport does not handle stdin EOF,
+  // so we listen directly. Without this the health-check server
+  // keeps the event loop alive and the container never exits.
+  //
+  // In persistent mode (MCP_KEEP_ALIVE=true), the main container process
+  // (PID 1) stays alive so clients can `docker exec` into it.
+  // Exec'd processes are never PID 1, so they always exit on stdin EOF.
+  const keepAlive = process.env.MCP_KEEP_ALIVE === 'true' || process.env.MCP_KEEP_ALIVE === '1';
+
+  if (keepAlive && process.pid === 1) {
+    console.error('Persistent mode — waiting for connections via `docker exec`');
+  } else {
+    process.stdin.on('end', () => {
+      console.error('stdin closed, shutting down…');
+      process.exit(0);
+    });
+  }
 }
 
 main().catch(console.error);

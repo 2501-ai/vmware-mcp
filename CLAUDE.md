@@ -17,18 +17,12 @@
 
 ## Adding a govc Command
 
-1. Add entry to `GOVC_COMMAND_INDEX` in `src/commands.ts`.
-2. Add `GovcToolDef` to `GOVC_TOOL_DEFS` with typed flags.
-3. Generator wires it automatically — no other files to touch.
-4. `bun run check`.
-
-## Git
-
-- **Never push to `main`**. Feature branch + PR.
-- **Never commit unless specifically asked to**.
-- Always run `bun run check` before committing.
-- Branch: `feature/<x>` or `fix/<x>`.
-- Commits: conventional (`feat:`, `fix:`, `refactor:`, `chore:`).
+1. Add entry to `GOVC_COMMAND_INDEX` in `src/commands/commandIndex.ts`.
+2. Add `GovcToolDef` to `GOVC_TOOL_DEFS` in `src/commands/toolDefs.ts` with typed flags.
+3. Types, flag helpers (`str`, `bool`, `num`, `strEnum`), and common flag groups (`VM`, `HOST`, etc.) live in `src/commands/types.ts`.
+4. Barrel re-export is in `src/commands/index.ts` — it also runs a startup sync check that warns if the index and tool defs are out of sync.
+5. Generator wires it automatically — no other files to touch.
+6. `bun run check`.
 
 ## .env
 
