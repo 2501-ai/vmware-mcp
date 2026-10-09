@@ -8,8 +8,9 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-  # 2501's registry: hosted MCP servers on 2501 run the image from there, and
-  # its Kyverno admits only images signed with the 2501 cosign key.
+  # 2501's build registry: pre-prod runs hosted MCP servers from there, and
+  # its Kyverno admits only images signed with the 2501 cosign key. Customers
+  # get a promoted copy in 2501.ai/release/vmware-mcp, not this one.
   ECR_IMAGE: 605134458542.dkr.ecr.eu-west-3.amazonaws.com/2501.ai/vmware-mcp
   AWS_REGION: eu-west-3
 
