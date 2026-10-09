@@ -8,6 +8,10 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  # 2501's registry: hosted MCP servers on 2501 run the image from there, and
+  # its Kyverno admits only images signed with the 2501 cosign key.
+  ECR_IMAGE: 605134458542.dkr.ecr.eu-west-3.amazonaws.com/2501.ai/vmware-mcp
+  AWS_REGION: eu-west-3
 
 jobs:
   check:
@@ -29,6 +33,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write
     steps:
       - uses: actions/checkout@v4
 
@@ -38,6 +43,16 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: arn:aws:iam::605134458542:role/GitHubAction-AssumeRoleWithAction
+          role-session-name: GitHub_vmware_mcp_build
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to ECR
+        uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2.1.7
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -49,6 +64,7 @@ jobs:
         run: echo "SHA_SHORT=${GITHUB_SHA::8}" >> "$GITHUB_ENV"
 
       - name: Build and push
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -57,5 +73,33 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.run_number }}-${{ env.SHA_SHORT }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.ECR_IMAGE }}:${{ github.run_number }}-${{ env.SHA_SHORT }}
+            ${{ env.ECR_IMAGE }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          provenance: false
+
+      - name: Generate SBOM
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ env.ECR_IMAGE }}@${{ steps.build.outputs.digest }}
+          scan-type: image
+          format: spdx-json
+          output: sbom.spdx.json
+
+      # cosign 2.x on purpose: 3.x writes signatures as OCI referrers, which
+      # 2501's Kyverno does not read.
+      - name: Install cosign
+        uses: sigstore/cosign-installer@d58896d6a1865668819e1d91763c7751a165e159 # v3.9.2
+        with:
+          cosign-release: v2.6.1
+
+      - name: Sign and attest with the 2501 key
+        env:
+          IMAGE_DIGEST: ${{ env.ECR_IMAGE }}@${{ steps.build.outputs.digest }}
+          COSIGN_KEY: awskms:///alias/2501-cosign
+        run: |
+          set -euo pipefail
+          cosign sign   --yes --tlog-upload=false --key "$COSIGN_KEY" "$IMAGE_DIGEST"
+          cosign attest --yes --tlog-upload=false --key "$COSIGN_KEY" \
+            --type spdxjson --predicate sbom.spdx.json "$IMAGE_DIGEST"
